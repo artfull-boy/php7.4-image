@@ -33,9 +33,14 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure and install GD extension
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-configure ldap --with-libdir=lib/x86_64-linux-gnu/
+# Configure GD extension
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg
+
+# Configure LDAP properly
+RUN apt-get update && apt-get install -y libldap2-dev \
+    && ln -s /usr/lib/x86_64-linux-gnu/libldap.so /usr/lib/libldap.so \
+    && ln -s /usr/lib/x86_64-linux-gnu/liblber.so /usr/lib/liblber.so \
+    && docker-php-ext-configure ldap
 
 # Install PHP extensions one by one to better identify any issues
 RUN docker-php-ext-install bcmath
