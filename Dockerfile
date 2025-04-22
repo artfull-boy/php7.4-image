@@ -1,38 +1,26 @@
-FROM nginx:latest
+FROM php:7.4-fpm
 
-USER root
-
-# Add repository for PHP 7.4
-RUN apt-get update && apt-get install -y software-properties-common \
-    && add-apt-repository -y ppa:ondrej/php \
-    && apt-get update
-
-# Install PHP 7.4 packages
-RUN apt-get install -y \
-    php7.4-cli \
-    php7.4-fpm \
-    php7.4-mysql \
-    php7.4-pgsql \
-    php7.4-bcmath \
-    php7.4-gd \
-    php7.4-intl \
-    php7.4-ldap \
-    php7.4-mbstring \
-    php7.4-pdo \
-    php7.4-soap \
-    php7.4-opcache \
-    php7.4-xml \
-    php7.4-gmp \
-    php7.4-apcu \
-    php7.4-zip \
-    php7.4-memcached \
+# Install nginx and other dependencies
+RUN apt-get update && apt-get install -y \
+    nginx \
+    default-mysql-client \
+    postgresql-client \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    libpq-dev \
+    libzip-dev \
+    libicu-dev \
+    libldap2-dev \
+    libxml2-dev \
+    libgmp-dev \
+    libmemcached-dev \
     libnss-wrapper \
     dnsutils \
     gettext \
     hostname \
     supervisor \
     ghostscript \
-    php7.4-imagick \
     fonts-liberation \
     libxaw7 \
     graphviz \
@@ -42,6 +30,31 @@ RUN apt-get install -y \
     wget \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN docker-php-ext-install \
+    bcmath \
+    gd \
+    intl \
+    ldap \
+    mbstring \
+    mysqli \
+    opcache \
+    pdo_mysql \
+    pdo_pgsql \
+    pgsql \
+    soap \
+    xml \
+    gmp \
+    zip
+
+# Install APCu and Memcached
+RUN pecl install apcu memcached \
+    && docker-php-ext-enable apcu memcached
+
+# Install Imagick
+RUN pecl install imagick \
+    && docker-php-ext-enable imagick
 
 # Install specific Composer version (2.5.4)
 RUN wget -O composer-setup.php https://getcomposer.org/installer \
@@ -55,27 +68,19 @@ RUN mkdir -p /var/run/php \
     && mkdir -p /var/cache/nginx/fastcgi_temp \
     && mkdir -p /var/cache/nginx/uwsgi_temp \
     && mkdir -p /var/cache/nginx/scgi_temp \
-    && chown -R nginx:nginx /var/cache/nginx \
+    && chown -R www-data:www-data /var/cache/nginx \
     && mkdir -p /var/lib/nginx/logs \
-    && chown -R nginx:nginx /var/lib/nginx \
+    && chown -R www-data:www-data /var/lib/nginx \
     && mkdir -p /run \
     && chmod 1777 /run
 
 # Remove default NGINX config
 RUN rm -f /etc/nginx/conf.d/default.conf
 
-# Create directories for PHP 7.4 FPM
-RUN mkdir -p /etc/php/7.4/fpm/pool.d
-
 # Copy configuration files
 COPY ./nginx.conf /etc/nginx/nginx.conf
 COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-
-# Update supervisord.conf to use PHP 7.4
-RUN sed -i "s|command=php-fpm|command=/usr/sbin/php-fpm7.4|g" /etc/supervisor/conf.d/supervisord.conf
-
-# Copy PHP-FPM pool configuration
-COPY ./www.conf /etc/php/7.4/fpm/pool.d/www.conf
+COPY ./www.conf /usr/local/etc/php-fpm.d/www.conf
 
 # Install specific Drush version (8.1.12)
 RUN composer global require drush/drush:8.1.12 \
@@ -85,12 +90,9 @@ RUN composer global require drush/drush:8.1.12 \
 # Set working directory for when code is uploaded
 WORKDIR /var/www/html
 
-# Fix permissions - add nginx user to www-data group
-RUN usermod -a -G www-data nginx
-
-# Verify file permissions are correct
+# Fix permissions
 RUN mkdir -p /var/www/html \
-    && chown -R nginx:nginx /var/www/html
+    && chown -R www-data:www-data /var/www/html
 
 EXPOSE 8080
 
