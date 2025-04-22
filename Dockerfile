@@ -28,32 +28,42 @@ RUN apt-get update && apt-get install -y \
     imagemagick \
     unzip \
     wget \
+    libonig-dev \
+    pkg-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
-RUN docker-php-ext-install \
-    bcmath \
-    gd \
-    intl \
-    ldap \
-    mbstring \
-    mysqli \
-    opcache \
-    pdo_mysql \
-    pdo_pgsql \
-    pgsql \
-    soap \
-    xml \
-    gmp \
-    zip
+# Configure and install GD extension
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure ldap --with-libdir=lib/x86_64-linux-gnu/
+
+# Install PHP extensions one by one to better identify any issues
+RUN docker-php-ext-install bcmath
+RUN docker-php-ext-install gd
+RUN docker-php-ext-install intl
+RUN docker-php-ext-install ldap
+RUN docker-php-ext-install mbstring
+RUN docker-php-ext-install mysqli
+RUN docker-php-ext-install opcache
+RUN docker-php-ext-install pdo_mysql
+RUN docker-php-ext-install pdo_pgsql
+RUN docker-php-ext-install pgsql
+RUN docker-php-ext-install soap
+RUN docker-php-ext-install xml
+RUN docker-php-ext-install gmp
+RUN docker-php-ext-install zip
 
 # Install APCu and Memcached
-RUN pecl install apcu memcached \
-    && docker-php-ext-enable apcu memcached
+RUN pecl install apcu \
+    && docker-php-ext-enable apcu
+    
+RUN apt-get update && apt-get install -y libmemcached-dev zlib1g-dev \
+    && pecl install memcached \
+    && docker-php-ext-enable memcached
 
 # Install Imagick
-RUN pecl install imagick \
+RUN apt-get update && apt-get install -y libmagickwand-dev \
+    && pecl install imagick \
     && docker-php-ext-enable imagick
 
 # Install specific Composer version (2.5.4)
@@ -75,7 +85,7 @@ RUN mkdir -p /var/run/php \
     && chmod 1777 /run
 
 # Remove default NGINX config
-RUN rm -f /etc/nginx/conf.d/default.conf
+RUN rm -f /etc/nginx/sites-enabled/default
 
 # Copy configuration files
 COPY ./nginx.conf /etc/nginx/nginx.conf
