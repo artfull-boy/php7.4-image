@@ -5,7 +5,7 @@ FROM php:7.4-fpm
 
 USER root
 
-# 2) Install system packages, Nginx, clients, and PHP extensions
+# 2) Install system packages, Nginx, clients, PHP build tools, and PHP extensions dependencies
 RUN apt-get update && apt-get install -y \
     nginx \
     default-mysql-client \
@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y \
     graphviz \
     libwmf-bin \
     imagemagick \
+    libmagickwand-dev \
     unzip \
     wget \
     libonig-dev \
@@ -56,13 +57,13 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
       gmp \
       zip
 
-# 4) APCu & Memcached via PECL
+# 4) Install APCu & Memcached via PECL
 RUN pecl install apcu \
     && docker-php-ext-enable apcu \
     && pecl install memcached \
     && docker-php-ext-enable memcached
 
-# 5) Imagick via PECL
+# 5) Install Imagick via PECL
 RUN pecl install imagick \
     && docker-php-ext-enable imagick
 
