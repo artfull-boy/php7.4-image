@@ -1,6 +1,11 @@
+# syntax=docker/dockerfile:1
+
+# 1) Base image: PHP 7.4 FPM
 FROM php:7.4-fpm
 
-# Install nginx and other dependencies
+USER root
+
+# 2) Install system packages, Nginx, clients, and PHP extensions
 RUN apt-get update && apt-get install -y \
     nginx \
     default-mysql-client \
@@ -19,7 +24,6 @@ RUN apt-get update && apt-get install -y \
     dnsutils \
     gettext \
     hostname \
-    supervisor \
     ghostscript \
     fonts-liberation \
     libxaw7 \
@@ -33,82 +37,56 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure GD extension
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg
+# 3) Configure and install PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+ && docker-php-ext-configure ldap \
+ && docker-php-ext-install \
+      bcmath \
+      gd \
+      intl \
+      ldap \
+      mbstring \
+      mysqli \
+      opcache \
+      pdo_mysql \
+      pdo_pgsql \
+      pgsql \
+      soap \
+      xml \
+      gmp \
+      zip
 
-# Configure LDAP properly
-RUN apt-get update && apt-get install -y libldap2-dev \
-    && ln -s /usr/lib/x86_64-linux-gnu/libldap.so /usr/lib/libldap.so \
-    && ln -s /usr/lib/x86_64-linux-gnu/liblber.so /usr/lib/liblber.so \
-    && docker-php-ext-configure ldap
-
-# Install PHP extensions one by one to better identify any issues
-RUN docker-php-ext-install bcmath
-RUN docker-php-ext-install gd
-RUN docker-php-ext-install intl
-RUN docker-php-ext-install ldap
-RUN docker-php-ext-install mbstring
-RUN docker-php-ext-install mysqli
-RUN docker-php-ext-install opcache
-RUN docker-php-ext-install pdo_mysql
-RUN docker-php-ext-install pdo_pgsql
-RUN docker-php-ext-install pgsql
-RUN docker-php-ext-install soap
-RUN docker-php-ext-install xml
-RUN docker-php-ext-install gmp
-RUN docker-php-ext-install zip
-
-# Install APCu and Memcached
+# 4) APCu & Memcached via PECL
 RUN pecl install apcu \
-    && docker-php-ext-enable apcu
-    
-RUN apt-get update && apt-get install -y libmemcached-dev zlib1g-dev \
+    && docker-php-ext-enable apcu \
     && pecl install memcached \
     && docker-php-ext-enable memcached
 
-# Install Imagick
-RUN apt-get update && apt-get install -y libmagickwand-dev \
-    && pecl install imagick \
+# 5) Imagick via PECL
+RUN pecl install imagick \
     && docker-php-ext-enable imagick
 
-# Install specific Composer version (2.5.4)
+# 6) Install specific Composer version (2.5.4)
 RUN wget -O composer-setup.php https://getcomposer.org/installer \
     && php composer-setup.php --install-dir=/usr/local/bin --filename=composer --version=2.5.4 \
     && rm composer-setup.php
 
-# Create required directories with proper permissions
-RUN mkdir -p /var/run/php \
-    && mkdir -p /var/cache/nginx/client_temp \
-    && mkdir -p /var/cache/nginx/proxy_temp \
-    && mkdir -p /var/cache/nginx/fastcgi_temp \
-    && mkdir -p /var/cache/nginx/uwsgi_temp \
-    && mkdir -p /var/cache/nginx/scgi_temp \
-    && chown -R www-data:www-data /var/cache/nginx \
-    && mkdir -p /var/lib/nginx/logs \
-    && chown -R www-data:www-data /var/lib/nginx \
-    && mkdir -p /run \
-    && chmod 1777 /run
-
-# Remove default NGINX config
-RUN rm -f /etc/nginx/sites-enabled/default
-
-# Copy configuration files
-COPY ./nginx.conf /etc/nginx/nginx.conf
-COPY ./supervisord.conf /etc/supervisor/supervisord.conf
-COPY ./www.conf /usr/local/etc/php-fpm.d/www.conf
-
-# Install specific Drush version (8.1.12)
+# 7) Install Drush 8.1.12 globally
 RUN composer global require drush/drush:8.1.12 \
-    && echo 'export PATH="$PATH:$HOME/.composer/vendor/bin"' >> /root/.bashrc \
     && ln -s /root/.composer/vendor/bin/drush /usr/local/bin/drush
 
-# Set working directory for when code is uploaded
-WORKDIR /var/www/html
+# 8) Copy Nginx and PHP-FPM pool configs
+COPY ./nginx.conf /etc/nginx/nginx.conf
+COPY ./www.conf   /usr/local/etc/php-fpm.d/www.conf
 
-# Fix permissions
+# 9) Create webroot and set permissions
 RUN mkdir -p /var/www/html \
     && chown -R www-data:www-data /var/www/html
 
-EXPOSE 8080
+WORKDIR /var/www/html
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+# 10) Expose port and add entrypoint
+EXPOSE 8080
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
