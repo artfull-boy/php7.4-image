@@ -94,7 +94,7 @@ RUN rm -f /etc/nginx/sites-enabled/default
 
 # Copy configuration files
 COPY ./nginx.conf /etc/nginx/nginx.conf
-COPY ./supervisord.conf /etc/supervisor/supervisord.conf
+COPY ./supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./www.conf /usr/local/etc/php-fpm.d/www.conf
 
 # Install specific Drush version (8.1.12)
