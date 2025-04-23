@@ -111,4 +111,5 @@ RUN mkdir -p /var/www/html \
 
 EXPOSE 8080
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+# Replace your CMD with this
+CMD service nginx start && php-fpm -F
